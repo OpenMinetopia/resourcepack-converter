@@ -20,7 +20,7 @@ public class CopySoundsJob extends ConversionJob {
             return;
         }
 
-        System.out.println("Source: " + source.getAbsolutePath());
-        FileUtils.copyDirectory(source, new File(Main.OUTPUT_DIR, "sounds"));
+        FileUtils.copyDirectory(source, new File(Main.OUTPUT_DIR, "assets/minecraft/sounds"));
+        FileUtils.copyFile(new File(Main.MINECRAFT_DIR, "sounds.json"), new File(Main.OUTPUT_DIR, "assets/minecraft/sounds.json"));
     }
 }
