@@ -9,6 +9,7 @@ import org.apache.commons.io.FileUtils;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 
 public class OptifineArmorJob extends ConversionJob {
@@ -27,14 +28,17 @@ public class OptifineArmorJob extends ConversionJob {
             for (File armorDir : parentArmorDir.listFiles()) {
                 if (!armorDir.isDirectory()) continue;
                 String armorName = armorDir.getName();
-                System.out.println("Found armor: " + armorName);
-                createEquipmentFile(armorDir);
-                createItemsArmorFiles(armorDir);
-                createModelsItemArmorFiles(armorDir);
+                if (armorName.contains(" ")) armorName = armorName.replace(" ", "_");
 
+                System.out.println("Found armor: " + armorName);
+
+                createEquipmentFile(armorDir);
+
+                List<String> equipmentTypes = new ArrayList<>();
                 for (File armorTexture : armorDir.listFiles()) {
                     if (!armorTexture.isFile()) continue;
                     String textureName = armorTexture.getName();
+                    if (textureName.contains(" ")) textureName = textureName.replace(" ", "_");
 
                     System.out.println("Found texture: " + textureName);
 
@@ -50,21 +54,25 @@ public class OptifineArmorJob extends ConversionJob {
 
                     if (textureName.endsWith("_boots_icon.png")) {
                         copyIcon(armorTexture, "boots");
+                        equipmentTypes.add("boots");
                         continue;
                     }
 
                     if (textureName.endsWith("_chestplate_icon.png")) {
                         copyIcon(armorTexture, "chestplate");
+                        equipmentTypes.add("chestplate");
                         continue;
                     }
 
                     if (textureName.endsWith("_helmet_icon.png")) {
                         copyIcon(armorTexture, "helmet");
+                        equipmentTypes.add("helmet");
                         continue;
                     }
 
                     if (textureName.endsWith("_leggings_icon.png")) {
                         copyIcon(armorTexture, "leggings");
+                        equipmentTypes.add("leggings");
                         continue;
                     }
 
@@ -72,6 +80,9 @@ public class OptifineArmorJob extends ConversionJob {
                     // copy the file to the output directory
                     //FileUtils.copyFile(armorTexture, new File(Main.OUTPUT_DIR, "assets/minecraft/optifine/cit/armor/" + armorName + "/" + textureName));
                 }
+
+                createItemsArmorFiles(armorDir, equipmentTypes);
+                createModelsItemArmorFiles(armorDir, equipmentTypes);
             }
         }
     }
@@ -79,6 +90,7 @@ public class OptifineArmorJob extends ConversionJob {
     @SneakyThrows
     private void copyLayer1(File source) {
         String armorName = source.getParentFile().getName() + ".png";
+        if (armorName.contains(" ")) armorName = armorName.replace(" ", "_");
 
         System.out.println("Copying layer 1: " + armorName);
         // copy the file to the output directory
@@ -88,6 +100,7 @@ public class OptifineArmorJob extends ConversionJob {
     @SneakyThrows
     private void copyLayer2(File source) {
         String armorName = source.getParentFile().getName() + ".png";
+        if (armorName.contains(" ")) armorName = armorName.replace(" ", "_");
 
         System.out.println("Copying layer 2: " + armorName);
         // copy the file to the output directory
@@ -97,6 +110,7 @@ public class OptifineArmorJob extends ConversionJob {
     @SneakyThrows
     private void copyIcon(File source, String type) {
         String armorName = source.getParentFile().getName();
+        if (armorName.contains(" ")) armorName = armorName.replace(" ", "_");
 
         // copy the file to the output directory
         FileUtils.copyFile(source, new File(Main.OUTPUT_DIR, "assets/minecraft/textures/item/armor/" + armorName + "/" + type + ".png"));
@@ -105,6 +119,8 @@ public class OptifineArmorJob extends ConversionJob {
     @SneakyThrows
     public void createEquipmentFile(File source) {
         String armorName = source.getName();
+        if (armorName.contains(" ")) armorName = armorName.replace(" ", "_");
+
         System.out.println("Creating equipment file for: " + armorName);
 
         // Root JSON node
@@ -123,12 +139,13 @@ public class OptifineArmorJob extends ConversionJob {
     }
 
     @SneakyThrows
-    public void createItemsArmorFiles(File source) {
+    public void createItemsArmorFiles(File source, List<String> equipmentTypes) {
         String armorName = source.getName();
+        if (armorName.contains(" ")) armorName = armorName.replace(" ", "_");
+
         System.out.println("Creating item armor file for: " + armorName);
 
-        List<String> armorTypes = List.of("helmet", "chestplate", "leggings", "boots");
-        for (String armorType : armorTypes) {
+        for (String armorType : equipmentTypes) {
             // Root JSON node
             ObjectNode rootNode = objectMapper.createObjectNode();
             ObjectNode modelNode = rootNode.putObject("model");
@@ -142,12 +159,13 @@ public class OptifineArmorJob extends ConversionJob {
     }
 
     @SneakyThrows
-    public void createModelsItemArmorFiles(File source) {
+    public void createModelsItemArmorFiles(File source, List<String> equipmentTypes) {
         String armorName = source.getName();
+        if (armorName.contains(" ")) armorName = armorName.replace(" ", "_");
+
         System.out.println("Creating models item armor file for: " + armorName);
 
-        List<String> armorTypes = List.of("helmet", "chestplate", "leggings", "boots");
-        for (String armorType : armorTypes) {
+        for (String armorType : equipmentTypes) {
             // Root JSON node
             ObjectNode rootNode = objectMapper.createObjectNode();
             rootNode.put("parent", "minecraft:item/generated");
