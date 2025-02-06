@@ -21,8 +21,14 @@ public class OptifineArmorJob extends ConversionJob {
     public void run() {
         System.out.println("Running OptifineArmorJob");
 
+        File optifineDir = new File(Main.OPTIFINE_DIR, "cit/armor");
+        if (!optifineDir.exists() || !optifineDir.isDirectory()) {
+            System.out.println("No armor found in Optifine directory, skipping...");
+            return;
+        }
+
         // loop through every directory in every subdirectory in assets/minecraft/optifine/cit/armor
-        for (File parentArmorDir : new File(Main.OPTIFINE_DIR, "cit/armor").listFiles()) {
+        for (File parentArmorDir : optifineDir.listFiles()) {
             if (!parentArmorDir.isDirectory()) continue;
 
             for (File armorDir : parentArmorDir.listFiles()) {
@@ -75,10 +81,6 @@ public class OptifineArmorJob extends ConversionJob {
                         equipmentTypes.add("leggings");
                         continue;
                     }
-
-
-                    // copy the file to the output directory
-                    //FileUtils.copyFile(armorTexture, new File(Main.OUTPUT_DIR, "assets/minecraft/optifine/cit/armor/" + armorName + "/" + textureName));
                 }
 
                 createItemsArmorFiles(armorDir, equipmentTypes);
