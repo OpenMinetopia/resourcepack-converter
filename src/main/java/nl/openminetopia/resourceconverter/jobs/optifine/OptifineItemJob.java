@@ -12,7 +12,9 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Iterator;
+import java.util.stream.Stream;
 
 public class OptifineItemJob extends ConversionJob {
 
@@ -24,113 +26,82 @@ public class OptifineItemJob extends ConversionJob {
         System.out.println("Running OptifineItemJob");
 
         File optifineDir = new File(Main.OPTIFINE_DIR, "cit/items");
-
         if (!optifineDir.exists() || !optifineDir.isDirectory()) {
             System.out.println("No items found in Optifine directory, skipping...");
             return;
         }
 
-        Files.walk(optifineDir.toPath())
-                .filter(path -> !path.toFile().isDirectory())
-                .forEach(path -> {
-                    File file = path.toFile();
-                    String itemName = file.getName().substring(0, file.getName().lastIndexOf('.'));
-                    if (itemName.contains(" ")) itemName = itemName.replace(" ", "_");
-
-                    String parentName = file.getParentFile().getName();
-                    if (parentName.contains(" ")) parentName = parentName.replace(" ", "_");
-
-                    if (file.getName().endsWith(".png")) {
-                        copyTexture(file);
-                    } else if (file.getName().endsWith(".json")) {
-                        copyModel(file);
-                        createItemsFile(parentName, itemName);
-                    }
-                });
-
-        // loop through every directory in every subdirectory in assets/minecraft/optifine/cit/item
+        try (Stream<Path> paths = Files.walk(optifineDir.toPath())) {
+            paths.filter(Files::isRegularFile).forEach(path -> processFile(path.toFile(), optifineDir));
+        }
     }
 
     @SneakyThrows
-    private void copyTexture(File texture) {
-        String textureName = texture.getName();
-        if (textureName.contains(" ")) textureName = textureName.replace(" ", "_");
+    private void processFile(File file, File baseDir) {
+        String relativePath = baseDir.toPath().relativize(file.toPath()).toString().replace(" ", "_");
 
-        String parentName = texture.getParentFile().getName();
-        if (parentName.contains(" ")) parentName = parentName.replace(" ", "_");
-
-        BufferedImage bimg = ImageIO.read(texture);
-        int width = bimg.getWidth();
-        int height = bimg.getHeight();
-
-        if (width >= 256 || height >= 256) {
-            System.out.println("Texture " + texture.getName() + " is too large, skipping...");
-            textureName = textureName + "_large";
+        if (file.getName().endsWith(".png")) {
+            copyTexture(file, new File(Main.OUTPUT_DIR, "assets/minecraft/textures/item/custom/" + relativePath).getPath());
+        } else if (file.getName().endsWith(".json")) {
+            copyModel(file, new File(Main.OUTPUT_DIR, "assets/minecraft/models/item/custom/" + relativePath).getPath());
+            createItemsFile(new File(Main.OUTPUT_DIR, "assets/minecraft/items/custom/" + relativePath).getPath());
         }
-
-        // copy the texture to the output directory
-        FileUtils.copyFile(texture, new File(Main.OUTPUT_DIR, "assets/minecraft/textures/item/custom/" + parentName + "/" + textureName));
     }
 
     @SneakyThrows
-    private void copyModel(File model) {
-        String modelName = model.getName();
-        if (modelName.contains(" ")) modelName = modelName.replace(" ", "_");
+    private void copyTexture(File texture, String outputPath) {
+//        BufferedImage bimg = ImageIO.read(texture);
+//        if (bimg.getWidth() >= 256 || bimg.getHeight() >= 256) {
+//            System.out.println("Texture " + texture.getName() + " is too large, skipping...");
+//            return;
+//        }
+        FileUtils.copyFile(texture, new File(outputPath));
+    }
 
-        String parentName = model.getParentFile().getName();
-        if (parentName.contains(" ")) parentName = parentName.replace(" ", "_");
-
-        // create the equipment file
-        String content = FileUtils.readFileToString(model, StandardCharsets.UTF_8);
-        if (content.charAt(0) == '\ufeff') {
-            content = content.substring(1);
-        }
+    @SneakyThrows
+    private void copyModel(File model, String outputPath) {
+        String content = FileUtils.readFileToString(model, StandardCharsets.UTF_8).replace("\ufeff", "");
         ObjectNode modelNode = (ObjectNode) objectMapper.readTree(content);
 
-        // modify parent model path if necessary
         if (modelNode.has("parent")) {
-            String parent = modelNode.get("parent").asText();
-
-            String[] split = parent.split("/");
-
-            if (split.length > 1) {
-                parent = split[split.length - 1];
-            }
-            parent = parent.replace(" ", "_").replace(".json", "");
-            modelNode.put("parent", "minecraft:item/custom/" + parentName + "/" + parent);
+            String parent = modelNode.get("parent").asText().replace("./", "");
+            String parentPath = outputPath.replaceFirst("/[^/]+$", "") + "/" + parent;
+            modelNode.put("parent", updatePath(parentPath));
         }
 
-        Iterator<String> fieldNames = modelNode.withObject("textures").fieldNames();
+        ObjectNode textures = modelNode.withObject("textures");
+        Iterator<String> fieldNames = textures.fieldNames();
         while (fieldNames.hasNext()) {
             String fieldName = fieldNames.next();
-            String value = modelNode.withObject("textures").get(fieldName).asText();
-
-            if (value.contains(" ")) value = value.replace(" ", "_");
-
-            String[] split = value.split("/");
-            if (split.length > 1) {
-                value = split[split.length - 1];
+            String texture = textures.get(fieldName).asText().replace("./", "");
+            if (texture.startsWith("block/")) {
+                textures.put(fieldName, texture.replace("block/", "minecraft:block/"));
+                continue;
             }
-
-            modelNode.withObject("textures").put(fieldName, "minecraft:item/custom/" + parentName + "/" + value);
+            String texturePath = outputPath.replaceFirst("/[^/]+$", "") + "/" + texture;
+            textures.put(fieldName, updatePath(texturePath));
         }
 
-        File destination = new File(Main.OUTPUT_DIR, "assets/minecraft/models/item/custom/" + parentName + "/" + modelName);
-        FileUtils.writeStringToFile(destination, objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(modelNode), StandardCharsets.UTF_8);
+        FileUtils.writeStringToFile(new File(outputPath), objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(modelNode), StandardCharsets.UTF_8);
     }
 
     @SneakyThrows
-    public void createItemsFile(String parentName, String itemName) {
-        System.out.println("Creating custom item file for: " + itemName);
-
-        // Root JSON node
+    private void createItemsFile(String outputPath) {
         ObjectNode rootNode = objectMapper.createObjectNode();
         ObjectNode modelNode = rootNode.putObject("model");
         modelNode.put("type", "minecraft:model");
-        modelNode.put("model", "minecraft:item/custom/" + parentName + "/" + itemName);
-
-        // Ensure the file is written correctly
-        File destination = new File(Main.OUTPUT_DIR, "assets/minecraft/items/custom/" + parentName + "/" + itemName + ".json");
-        FileUtils.writeStringToFile(destination, objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(rootNode), StandardCharsets.UTF_8);
+        modelNode.put("model", updatePath(outputPath));
+        FileUtils.writeStringToFile(new File(outputPath), objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(rootNode), StandardCharsets.UTF_8);
     }
+
+    private String updatePath(String path) {
+        path = path.replace(" ", "_").replace(".json", "");
+
+        if (path.contains("/custom/")) {
+            return "minecraft:item" + path.substring(path.indexOf("/custom/"));
+        }
+
+        return "minecraft:item/custom/" + path.substring(path.lastIndexOf("/") + 1);
+    }
+
 }
