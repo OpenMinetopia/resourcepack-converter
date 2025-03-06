@@ -38,7 +38,7 @@ public class CopyPackMetaJob extends ConversionJob {
             packNode.put("description", "§e[OpenMinetopia] Converted with \n§7openminetopia.nl");
         }
 
-        packMeta.withObject("pack").put("pack_format", 61);
+        packMeta.withObject("pack").put("pack_format", 46);
 
         FileUtils.writeStringToFile(destination, objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(packMeta), StandardCharsets.UTF_8);
         System.out.println("pack.mcmeta successfully created/modified and copied.");

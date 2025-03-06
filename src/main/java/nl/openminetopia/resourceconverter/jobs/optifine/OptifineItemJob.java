@@ -7,8 +7,6 @@ import nl.openminetopia.resourceconverter.Main;
 import nl.openminetopia.resourceconverter.jobs.ConversionJob;
 import org.apache.commons.io.FileUtils;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
